@@ -176,7 +176,7 @@ void Profiler::StoreProfileInHistory(std::string_view name, float percent) {
     newRatio = 1.0f;
   }
   oldRatio = 1.0f - newRatio;
-
+   
   while (i < NUM_PROFILE_SAMPLES && g_history[i].bValid == true) {
     if (name == g_history[i].szName) { // Found the sample
       g_history[i].fAve = (g_history[i].fAve * oldRatio) + (percent * newRatio);
