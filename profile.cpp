@@ -18,13 +18,11 @@ struct ProfileSample {
   unsigned int iNumParents;       // Number of profile parents
 };
 
-typedef struct {
+struct ProfileSampleHistory{
   bool bValid;        // Whether the data is valid
   std::string szName; // Name of the sample
-  float fAve;         // Average time per frame (percentage)
-  float fMin;         // Minimum time per frame (percentage)
-  float fMax;         // Maximum time per frame (percentage)
-} ProfileSampleHistory;
+  Profiler::TimePerFrame times;
+} ;
 #define NUM_PROFILE_SAMPLES 50
 ProfileSample g_samples[NUM_PROFILE_SAMPLES];
 ProfileSampleHistory g_history[NUM_PROFILE_SAMPLES];
@@ -123,7 +121,7 @@ void Profiler::Profile(void) {
 
   while (i < NUM_PROFILE_SAMPLES && g_samples[i].bValid == true) {
     unsigned int indent = 0;
-    float sampleTime, percentTime, aveTime, minTime, maxTime;
+    float sampleTime, percentTime;
     char line[256];
     std::string name, indentedName;
     char ave[16], min[16], max[16], num[16];
@@ -137,13 +135,10 @@ void Profiler::Profile(void) {
     sampleTime = g_samples[i].fAccumulator - g_samples[i].fChildrenSampleTime;
     percentTime = (sampleTime / (g_endProfile - g_startProfile)) * 100.0f;
 
-    aveTime = minTime = maxTime = percentTime;
-
     // Add new measurement into the history and get the ave, min, and max
     StoreProfileInHistory(g_samples[i].szName, percentTime);
-    GetProfileFromHistory(g_samples[i].szName, &aveTime, &minTime, &maxTime);
-
-    // Format the data
+   
+    auto [aveTime, minTime, maxTime] = GetProfileFromHistory(g_samples[i].szName);
     sprintf(ave, "%3.1f", aveTime);
     sprintf(min, "%3.1f", minTime);
     sprintf(max, "%3.1f", maxTime);
@@ -180,23 +175,24 @@ void Profiler::StoreProfileInHistory(std::string_view name, float percent) {
 
   while (i < NUM_PROFILE_SAMPLES && g_history[i].bValid == true) {
     if (name == g_history[i].szName) { // Found the sample
-      g_history[i].fAve = (g_history[i].fAve * oldRatio) + (percent * newRatio);
-      if (percent < g_history[i].fMin) {
-        g_history[i].fMin = percent;
+      auto &sample = g_history[i];
+        sample.times.average = (sample.times.average * oldRatio) + (percent * newRatio);
+      if (percent < sample.times.min) {
+        sample.times.min = percent;
       } else {
-        g_history[i].fMin =
-            (g_history[i].fMin * oldRatio) + (percent * newRatio);
+        sample.times.min =
+            (sample.times.min * oldRatio) + (percent * newRatio);
       }
 
-      if (g_history[i].fMin < 0.0f) {
-        g_history[i].fMin = 0.0f;
+      if (sample.times.min < 0.0f) {
+        sample.times.min = 0.0f;
       }
 
-      if (percent > g_history[i].fMax) {
-        g_history[i].fMax = percent;
+      if (percent > sample.times.max) {
+        sample.times.max = percent;
       } else {
-        g_history[i].fMax =
-            (g_history[i].fMax * oldRatio) + (percent * newRatio);
+        sample.times.max =
+            (sample.times.max * oldRatio) + (percent * newRatio);
       }
       return;
     }
@@ -206,25 +202,20 @@ void Profiler::StoreProfileInHistory(std::string_view name, float percent) {
   if (i < NUM_PROFILE_SAMPLES) { // Add to history
     g_history[i].szName = name;
     g_history[i].bValid = true;
-    g_history[i].fAve = g_history[i].fMin = g_history[i].fMax = percent;
+    g_history[i].times.setAll(percent);
   } else {
     assert(!"Exceeded Max Available Profile Samples!");
   }
 }
-void Profiler::GetProfileFromHistory(std::string_view name, float *ave,
-                                     float *min, float *max) {
+Profiler::TimePerFrame Profiler::GetProfileFromHistory(std::string_view name) {
   unsigned int i = 0;
   while (i < NUM_PROFILE_SAMPLES && g_history[i].bValid == true) {
     if (name == g_history[i].szName) { // Found the sample
-
-      *ave = g_history[i].fAve;
-      *min = g_history[i].fMin;
-      *max = g_history[i].fMax;
-      return;
+      return g_history[i].times;      
     }
     i++;
   }
-  *ave = *min = *max = 0.0f;
+  return {};
 }
 void Profiler::Draw(void) {
   if (!textBox.empty()) {
