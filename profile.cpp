@@ -1,5 +1,4 @@
 #define _CRT_SECURE_NO_WARNINGS
-
 #include "profile.h"
 #include "custom_time.h"
 #include <iostream>
@@ -8,23 +7,23 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-typedef struct {
-  bool bValid;                    // Whether this data is valid
+struct ProfileSample {
+  bool bValid = false;            // Whether this data is valid
   unsigned int iProfileInstances; // # of times ProfileBegin called
   int iOpenProfiles;              // # of times ProfileBegin w/o ProfileEnd
-  char szName[256];               // Name of sample
+  std::string szName;             // Name of sample
   float fStartTime;               // The current open profile start time
   float fAccumulator;             // All samples this frame added together
   float fChildrenSampleTime;      // Time taken by all children
   unsigned int iNumParents;       // Number of profile parents
-} ProfileSample;
+};
 
 typedef struct {
-  bool bValid;      // Whether the data is valid
-  char szName[256]; // Name of the sample
-  float fAve;       // Average time per frame (percentage)
-  float fMin;       // Minimum time per frame (percentage)
-  float fMax;       // Maximum time per frame (percentage)
+  bool bValid;        // Whether the data is valid
+  std::string szName; // Name of the sample
+  float fAve;         // Average time per frame (percentage)
+  float fMin;         // Minimum time per frame (percentage)
+  float fMax;         // Maximum time per frame (percentage)
 } ProfileSampleHistory;
 #define NUM_PROFILE_SAMPLES 50
 ProfileSample g_samples[NUM_PROFILE_SAMPLES];
@@ -61,13 +60,14 @@ void Profiler::Begin(std::string_view name) {
     return;
   }
 
-  strcpy(g_samples[i].szName, name.data());
-  g_samples[i].bValid = true;
-  g_samples[i].iOpenProfiles = 1;
-  g_samples[i].iProfileInstances = 1;
-  g_samples[i].fAccumulator = 0.0f;
-  g_samples[i].fStartTime = GetExactTime();
-  g_samples[i].fChildrenSampleTime = 0.0f;
+  auto &sample = g_samples[i];
+  sample.szName = name;
+  sample.bValid = true;
+  sample.iOpenProfiles = 1;
+  sample.iProfileInstances = 1;
+  sample.fAccumulator = 0.0f;
+  sample.fStartTime = GetExactTime();
+  sample.fChildrenSampleTime = 0.0f;
 }
 void Profiler::End(std::string_view name) {
   unsigned int i = 0;
@@ -124,7 +124,8 @@ void Profiler::Profile(void) {
   while (i < NUM_PROFILE_SAMPLES && g_samples[i].bValid == true) {
     unsigned int indent = 0;
     float sampleTime, percentTime, aveTime, minTime, maxTime;
-    char line[256], name[256], indentedName[256];
+    char line[256];
+    std::string name, indentedName;
     char ave[16], min[16], max[16], num[16];
 
     if (g_samples[i].iOpenProfiles < 0) {
@@ -148,14 +149,14 @@ void Profiler::Profile(void) {
     sprintf(max, "%3.1f", maxTime);
     sprintf(num, "%3d", g_samples[i].iProfileInstances);
 
-    strcpy(indentedName, g_samples[i].szName);
+    indentedName = g_samples[i].szName;
     for (indent = 0; indent < g_samples[i].iNumParents; indent++) {
-      sprintf(name, "   %s", indentedName);
-      strcpy(indentedName, name);
+      name = "     " + indentedName;
+      indentedName = name;
     }
-
+    
     sprintf(line, "%5s : %5s : %5s : %3s : %s\n", ave, min, max, num,
-            indentedName);
+            indentedName.c_str());
     textBox.append(line); // Send the line to text buffer
     i++;
   }
@@ -176,7 +177,7 @@ void Profiler::StoreProfileInHistory(std::string_view name, float percent) {
     newRatio = 1.0f;
   }
   oldRatio = 1.0f - newRatio;
-   
+
   while (i < NUM_PROFILE_SAMPLES && g_history[i].bValid == true) {
     if (name == g_history[i].szName) { // Found the sample
       g_history[i].fAve = (g_history[i].fAve * oldRatio) + (percent * newRatio);
@@ -203,7 +204,7 @@ void Profiler::StoreProfileInHistory(std::string_view name, float percent) {
   }
 
   if (i < NUM_PROFILE_SAMPLES) { // Add to history
-    strcpy(g_history[i].szName, name.data());
+    g_history[i].szName = name;
     g_history[i].bValid = true;
     g_history[i].fAve = g_history[i].fMin = g_history[i].fMax = percent;
   } else {
