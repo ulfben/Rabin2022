@@ -1,10 +1,11 @@
 #define _CRT_SECURE_NO_WARNINGS
+#include <format>
 #include "profile.h"
 #include "custom_time.h"
 #include <iostream>
 #include <string>
 
-#include <assert.h>
+#include <cassert>
 #include <stdio.h>
 #include <string.h>
 struct ProfileSample {
@@ -120,38 +121,30 @@ void Profiler::Profile(void) {
   textBox.append("--------------------------------------------\n");
 
   while (i < NUM_PROFILE_SAMPLES && g_samples[i].bValid == true) {
-    unsigned int indent = 0;
-    float sampleTime, percentTime;
-    char line[256];
-    std::string name, indentedName;
-    char ave[16], min[16], max[16], num[16];
-
     if (g_samples[i].iOpenProfiles < 0) {
       assert(!"ProfileEnd() called without a ProfileBegin()");
     } else if (g_samples[i].iOpenProfiles > 0) {
       assert(!"ProfileBegin() called without a ProfileEnd()");
     }
-
-    sampleTime = g_samples[i].fAccumulator - g_samples[i].fChildrenSampleTime;
-    percentTime = (sampleTime / (g_endProfile - g_startProfile)) * 100.0f;
+    const auto sampleTime = g_samples[i].fAccumulator - g_samples[i].fChildrenSampleTime;
+    const auto percentTime = (sampleTime / (g_endProfile - g_startProfile)) * 100.0f;
 
     // Add new measurement into the history and get the ave, min, and max
     StoreProfileInHistory(g_samples[i].szName, percentTime);
-   
+  
     auto [aveTime, minTime, maxTime] = GetProfileFromHistory(g_samples[i].szName);
-    sprintf(ave, "%3.1f", aveTime);
-    sprintf(min, "%3.1f", minTime);
-    sprintf(max, "%3.1f", maxTime);
-    sprintf(num, "%3d", g_samples[i].iProfileInstances);
-
-    indentedName = g_samples[i].szName;
-    for (indent = 0; indent < g_samples[i].iNumParents; indent++) {
-      name = "     " + indentedName;
-      indentedName = name;
-    }
     
-    sprintf(line, "%5s : %5s : %5s : %3s : %s\n", ave, min, max, num,
-            indentedName.c_str());
+    const std::string ave = std::format("{:.1f}", aveTime);
+    const std::string min = std::format("{:.1f}", minTime);
+    const std::string max = std::format("{:.1f}", maxTime);
+    const std::string num = std::format("{}", g_samples[i].iProfileInstances);
+   // sprintf(num, "%3d", g_samples[i].iProfileInstances);
+    
+    const std::string indentedName =
+        std::string("\t", g_samples[i].iNumParents) + g_samples[i].szName;
+   //TODO: figure out how to limit the length of formatter
+    const std::string line = std::format( "{:5} : {:5} : {:5} : {:3} : {}\n",ave, min, max, num,indentedName);
+   
     textBox.append(line); // Send the line to text buffer
     i++;
   }
