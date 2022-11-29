@@ -134,7 +134,9 @@ void Profiler::Profile(void) {
   
     auto [aveTime, minTime, maxTime] = GetProfileFromHistory(g_samples[i].szName);
     
-    const std::string ave = std::format("{:.1f}", aveTime);
+    std::string ave;
+    std::format_to_n(std::back_inserter(ave), 5,
+                        "{:.1f}", aveTime);
     const std::string min = std::format("{:.1f}", minTime);
     const std::string max = std::format("{:.1f}", maxTime);
     const std::string num = std::format("{}", g_samples[i].iProfileInstances);
