@@ -14,12 +14,11 @@ struct Sample {
   float fStartTime = 0.0f;            // The current open profile start time
   float fAccumulator = 0.0f;          // All samples this frame added together
   float fChildrenSampleTime = 0.0f;   // Time taken by all children
-  unsigned int iNumParents = 0;       // Number of profile parents
+  std::size_t iNumParents = 0;       // Number of profile parents
   Sample(std::string_view name) noexcept
       : szName{name}, iOpenProfiles{1}, iProfileInstances{1},
         fStartTime{GetExactTime()} {}
 };
-
 struct SampleHistory {
   std::string_view szName; // Name of the sample
   Profiler::TimePerFrame times{};
@@ -49,6 +48,20 @@ float _startTime = 0.0f;
 float _endTime = 0.0f;
 std::string textBox = "";
 
+
+void assert_if_invalid(const Sample &s) noexcept {
+    if (s.iOpenProfiles < 0) {
+      assert(!"ProfileEnd() called without a ProfileBegin()");
+    } else if (s.iOpenProfiles > 0) {
+      assert(!"ProfileBegin() called without a ProfileEnd()");
+    }
+}
+
+bool isParent(const Sample &s) noexcept { return s.iOpenProfiles > 0; }
+size_t countParents() noexcept {
+    return std::ranges::count_if(samples, isParent);
+}
+
 Profiler::Profiler() noexcept { _startTime = GetExactTime(); }
 void Profiler::Begin(std::string_view name) {
   auto it = std::ranges::find_if(
@@ -62,41 +75,38 @@ void Profiler::Begin(std::string_view name) {
   it->fStartTime = GetExactTime();
 }
 
-void Profiler::End(std::string_view name) {  
+void Profiler::End(std::string_view name) {
   const auto &it = std::ranges::find_if(
       samples, [name](const auto &sample) { return name == sample.szName; });
   if (it == std::end(samples)) {
+    assert(!"End() called without a Begin()");
     return;
   }
-  unsigned int numParents = 0;
-  unsigned int inner = 0;
   int parent = -1;
   const float fEndTime = GetExactTime();
   it->iOpenProfiles--;
-  // Count all parents and find the immediate parent
-  while (inner < std::size(samples)) {
-    if (samples[inner].iOpenProfiles >
-        0) { // Found a parent (any open profiles are parents)
-      numParents++;
-      if (parent < 0) { // Replace invalid parent (index)
-        parent = inner;
-      } else if (samples[inner].fStartTime >=
-                 samples[parent]
-                     .fStartTime) { // Replace with more immediate parent
-        parent = inner;
+
+  it->iNumParents = countParents();
+  if (it->iNumParents) {
+    for (int i = 0; i < std::ssize(samples); ++i) {
+      if (isParent(samples[i])) {        
+        if (parent < 0) { // Replace invalid parent (index)
+          parent = i;
+        } else if (samples[i].fStartTime >=
+                   samples[parent]
+                       .fStartTime) { // Replace with more immediate parent
+          parent = i;
+        }
       }
     }
-    inner++;
-  }
-
-  // Remember the current number of parents of the sample
-  it->iNumParents = numParents;
-
+  }    
+  // Count all parents and find the immediate parent
   if (parent >= 0) { // Record this time in fChildrenSampleTime (add it in)
     samples[parent].fChildrenSampleTime += fEndTime - it->fStartTime;
   }
-  // Save sample time in accumulator
-  it->fAccumulator += fEndTime - it->fStartTime;
+
+  it->fAccumulator +=
+      fEndTime - it->fStartTime; // Save sample time in accumulator
 }
 void Profiler::Profile(void) {
   _endTime = GetExactTime();
@@ -105,16 +115,12 @@ void Profiler::Profile(void) {
   textBox.append("--------------------------------------------\n");
 
   for (const auto &sample : samples) {
-    if (sample.iOpenProfiles < 0) {
-      assert(!"ProfileEnd() called without a ProfileBegin()");
-    } else if (sample.iOpenProfiles > 0) {
-      assert(!"ProfileBegin() called without a ProfileEnd()");
-    }
+    assert_if_invalid(sample);    
     const auto sampleTime = sample.fAccumulator - sample.fChildrenSampleTime;
     const auto percentTime = (sampleTime / (_endTime - _startTime)) * 100.0f;
+    
     StoreProfileInHistory(sample.szName, percentTime);
-    const auto [aveTime, minTime, maxTime] =
-        GetProfileFromHistory(sample.szName);
+    const auto [aveTime, minTime, maxTime] = GetProfileFromHistory(sample.szName);
 
     std::string ave;
     std::format_to_n(std::back_inserter(ave), 5, "{:.1f}", aveTime);
