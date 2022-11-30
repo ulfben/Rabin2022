@@ -28,6 +28,21 @@ struct SampleHistory {
   SampleHistory(std::string_view name, float percent) : szName{name} {
     times.setAll(percent);
   }
+
+  void updateTimings(float percent, float newRatio) {
+    const float oldRatio = 1.0f - newRatio;
+    const float percentNewRatio = (percent * newRatio);
+    times.average = (times.average * oldRatio) + percentNewRatio;
+    times.min = (percent < times.min)
+                    ? percent
+                    : (times.min * oldRatio) + percentNewRatio;
+    if (times.min < 0.0f) {
+      times.min = 0.0f;
+    }
+    times.max = (percent > times.max)
+                    ? percent
+                    : (times.max * oldRatio) + percentNewRatio;
+  }
 };
 
 std::vector<Sample> samples;
@@ -137,9 +152,7 @@ void Profiler::Profile(void) {
   }
 }
 void Profiler::StoreProfileInHistory(std::string_view name, float percent) {
-  const float newRatio = std::min(0.8f * GetElapsedTime(), 1.0f); //limit to 1
-  const float oldRatio = 1.0f - newRatio;
-
+  const float newRatio = std::min(0.8f * GetElapsedTime(), 1.0f); // limit to 1
   const auto it = std::ranges::find_if(
       history, [&name](const auto &sample) { return sample.szName == name; });
 
@@ -147,25 +160,7 @@ void Profiler::StoreProfileInHistory(std::string_view name, float percent) {
     history.push_back(SampleHistory(name, percent));
     return;
   }
-
-  auto &times = it->times;
-  times.average = (times.average * oldRatio) + (percent * newRatio);
-  if (percent < times.min) {
-    times.min = percent;
-  } else {
-    times.min = (times.min * oldRatio) + (percent * newRatio);
-  }
-
-  if (times.min < 0.0f) {
-    times.min = 0.0f;
-  }
-
-  if (percent > times.max) {
-    times.max = percent;
-  } else {
-    times.max = (times.max * oldRatio) + (percent * newRatio);
-  }
-  it->times = times;
+  it->updateTimings(percent, newRatio);
 }
 Profiler::TimePerFrame Profiler::GetProfileFromHistory(std::string_view name) {
   const auto it = std::ranges::find_if(
