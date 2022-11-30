@@ -7,6 +7,11 @@
 #include <string_view>
 #include <vector>
 using namespace std::string_view_literals;
+struct TimePerFrame {
+    float average = .0f; // Average time per frame (percentage)
+    float min = .0f;     // Minimum time per frame (percentage)
+    float max = .0f;     // Maximum time per frame (percentage)   
+  };  
 struct Sample {
   std::string_view name;
   unsigned int count = 1; // # of times Profile::Begin called
@@ -19,7 +24,7 @@ struct Sample {
 };
 struct SampleHistory {
   std::string_view name; // Name of the sample
-  Profiler::TimePerFrame times{};
+  TimePerFrame times{};
   SampleHistory(std::string_view name, float percent) noexcept : name{name}, times{percent, percent, percent} {}
 
   void updateTimings(float percent, float newRatio) noexcept {
@@ -38,7 +43,7 @@ std::vector<Sample> samples;
 std::vector<SampleHistory> history;
 float _startTime = 0.0f;
 float _endTime = 0.0f;
-std::string textBox = ""; //stand-in for the original codes' GUI window type.
+std::string textBox = ""; //stand-in for the original codes' GUI window.
 
 void assert_if_invalid(const Sample &s) noexcept {
   if (s.openProfiles < 0) {
@@ -47,7 +52,6 @@ void assert_if_invalid(const Sample &s) noexcept {
     assert(!"Profile::Begin() called without a Profile::End()");
   }
 }
-
 std::string indent_n(size_t levels, std::string_view s) {        
     return std::string("\t", levels) + std::string(s);
 }
@@ -60,6 +64,7 @@ auto findHistory(std::string_view name) noexcept {
 bool hasParents(const Sample &s) noexcept { return s.parentCount > 0; }
 bool isParent(const Sample &s) noexcept { return s.openProfiles > 0; }
 size_t countParents() noexcept { return std::ranges::count_if(samples, isParent); }
+
 auto findClosestParent() noexcept {
   auto parent = std::ranges::find_if(samples, isParent);
   if (parent != std::end(samples)) {
@@ -75,9 +80,27 @@ auto findClosestParent() noexcept {
   return parent;
 }
 
+void storeProfile(std::string_view name, float percent) { 
+  const auto profile = findHistory(name);
+  if (profile == std::end(history)) {
+    history.push_back(SampleHistory(name, percent));
+    return;
+  }
+  const float newRatio = std::min(0.8f * GetElapsedTime(), 1.0f); // limit to 1
+  profile->updateTimings(percent, newRatio);
+}
 
-Profiler::Profiler() noexcept { _startTime = GetExactTime(); }
+TimePerFrame getTimings(std::string_view name) noexcept {
+  const auto profile = findHistory(name);
+  if (profile != std::end(history)) {
+    return profile->times;
+  }
+  return {};
+}
+
+void Profiler::Init() noexcept { _startTime = GetExactTime(); }
 void Profiler::Begin(std::string_view name) {
+  assert(_startTime && "Profile::Begin() called without calling Profiler::Init() first!");
   auto it = findSample(name);
   if (it == std::end(samples)) {
     samples.push_back(Sample(name));
@@ -94,8 +117,8 @@ void Profiler::End(std::string_view name) noexcept {
     assert(!"End() called without a Begin()");
     return;
   }
-  const float fEndTime = GetExactTime();
-  const float dt = fEndTime - sample->startTime;
+  const float endTime = GetExactTime();
+  const float dt = endTime - sample->startTime;
   sample->accumulator += dt;
   sample->openProfiles--;
   sample->parentCount = countParents();
@@ -113,32 +136,13 @@ void Profiler::Profile(void) {
     assert_if_invalid(sample);
     const auto sampleTime = sample.accumulator - sample.childrensTime;
     const auto percentTime = (sampleTime / (_endTime - _startTime)) * 100.0f;
-    StoreProfileInHistory(sample.name, percentTime);
-    const auto [aveTime, minTime, maxTime] = GetProfileFromHistory(sample.name);          
+    storeProfile(sample.name, percentTime);
+    const auto [aveTime, minTime, maxTime] = getTimings(sample.name);          
     textBox += std::format("{:5.1f} : {:5.1f} : {:5.1f} : {:3} : {}\n"sv,
-                            aveTime, minTime,  maxTime,   sample.count, indent_n(sample.parentCount, sample.name));    
+                            aveTime,  minTime,  maxTime, sample.count, indent_n(sample.parentCount, sample.name));    
   }
   samples.clear();
   _startTime = GetExactTime();
-}
-
-void Profiler::StoreProfileInHistory(std::string_view name, float percent) { 
-  const auto profile = findHistory(name);
-  if (profile == std::end(history)) {
-    history.push_back(SampleHistory(name, percent));
-    return;
-  }
-  const float newRatio = std::min(0.8f * GetElapsedTime(), 1.0f); // limit to 1
-  profile->updateTimings(percent, newRatio);
-}
-
-Profiler::TimePerFrame
-Profiler::GetProfileFromHistory(std::string_view name) noexcept {
-  const auto profile = findHistory(name);
-  if (profile != std::end(history)) {
-    return profile->times;
-  }
-  return {};
 }
 
 void Profiler::Draw(void) {  

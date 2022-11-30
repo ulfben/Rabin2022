@@ -7,27 +7,12 @@
  * below is included in the resulting source code, for example:
  * "Portions Copyright (C) Steve Rabin, 2000"
  */
-
 #pragma once
 #include <string_view>
-
-class Profiler {
-public:
-  struct TimePerFrame {
-    float average = .0f; // Average time per frame (percentage)
-    float min = .0f;     // Minimum time per frame (percentage)
-    float max = .0f;     // Maximum time per frame (percentage)   
-  };
-
-  Profiler() noexcept;
+namespace Profiler {
+  void Init() noexcept;
   void Begin(std::string_view name);
   void End(std::string_view name) noexcept;
   void Profile(void);
   void Draw();
-
-private:
-  void StoreProfileInHistory(std::string_view name, float percent);
-  TimePerFrame GetProfileFromHistory(std::string_view name) noexcept;
 };
-
-
