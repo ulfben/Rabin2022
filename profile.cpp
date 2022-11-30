@@ -1,4 +1,3 @@
-#define _CRT_SECURE_NO_WARNINGS
 #include "profile.h"
 #include "custom_time.h"
 #include <cassert>
@@ -28,13 +27,9 @@ struct SampleHistory {
     const float percentNewRatio = (percent * newRatio);
     auto &[average, min, max] = times;
     average = (average * oldRatio) + percentNewRatio;
-    min = (percent < min)
-                    ? percent
-                    : (min * oldRatio) + percentNewRatio;
-    min = std::max(min, 0.0f); //don't allow values to go negative.    
-    max = (percent > max)
-                    ? percent
-                    : (max * oldRatio) + percentNewRatio;
+    min = (percent < min) ? percent : (min * oldRatio) + percentNewRatio;
+    min = (min < 0.0f) ? 0.0f : min;  //don't allow negative values
+    max = (percent > max) ? percent : (max * oldRatio) + percentNewRatio;
   }
 };
 
@@ -43,7 +38,7 @@ std::vector<Sample> samples;
 std::vector<SampleHistory> history;
 float _startTime = 0.0f;
 float _endTime = 0.0f;
-std::string textBox = "";
+std::string textBox = ""; //stand-in for the original codes' GUI window type.
 
 void assert_if_invalid(const Sample &s) noexcept {
   if (s.openProfiles < 0) {
@@ -53,7 +48,7 @@ void assert_if_invalid(const Sample &s) noexcept {
   }
 }
 
-std::string indent_n(size_t levels, std::string_view s) {
+std::string indent_n(size_t levels, std::string_view s) {        
     return std::string("\t", levels) + std::string(s);
 }
 auto findSample(std::string_view name) noexcept {
@@ -65,7 +60,6 @@ auto findHistory(std::string_view name) noexcept {
 bool hasParents(const Sample &s) noexcept { return s.parentCount > 0; }
 bool isParent(const Sample &s) noexcept { return s.openProfiles > 0; }
 size_t countParents() noexcept { return std::ranges::count_if(samples, isParent); }
-
 auto findClosestParent() noexcept {
   auto parent = std::ranges::find_if(samples, isParent);
   if (parent != std::end(samples)) {
@@ -111,32 +105,18 @@ void Profiler::End(std::string_view name) noexcept {
   }
 }
 
-void to_string(float val, std::string &out, size_t maxLength = 5) {
-    out.clear();
-    std::format_to_n(std::back_inserter(out), maxLength, "{:.1f}"sv, val);
-}
-void to_string(unsigned int val, std::string &out) {
-    out.clear();
-    std::format_to_n(std::back_inserter(out), 3, "{}"sv, val);
-}
-
 void Profiler::Profile(void) {
   _endTime = GetExactTime();
   textBox.clear();
   textBox.append(header);
-  std::string ave, min, max, num; //hoisted out of loop for re-se.
   for (const auto &sample : samples) {
     assert_if_invalid(sample);
     const auto sampleTime = sample.accumulator - sample.childrensTime;
     const auto percentTime = (sampleTime / (_endTime - _startTime)) * 100.0f;
     StoreProfileInHistory(sample.name, percentTime);
-    const auto [aveTime, minTime, maxTime] = GetProfileFromHistory(sample.name);
-    to_string(aveTime, ave);
-    to_string(minTime, min);
-    to_string(maxTime, max); 
-    to_string(sample.count, num);              
-    textBox += std::format("{:5} : {:5} : {:5} : {:3} : {}\n"sv,
-                            ave,   min,    max,   num, indent_n(sample.parentCount, sample.name));    
+    const auto [aveTime, minTime, maxTime] = GetProfileFromHistory(sample.name);          
+    textBox += std::format("{:5.1f} : {:5.1f} : {:5.1f} : {:3} : {}\n"sv,
+                            aveTime, minTime,  maxTime,   sample.count, indent_n(sample.parentCount, sample.name));    
   }
   samples.clear();
   _startTime = GetExactTime();
