@@ -7,12 +7,8 @@
  * below is included in the resulting source code, for example:
  * "Portions Copyright (C) Steve Rabin, 2000"
  */
-#ifndef _CUSTOM_TIME_H
-#define _CUSTOM_TIME_H
-
-void InitTime( void ) noexcept;
-void MarkTimeThisTick( void ) noexcept;
-float GetElapsedTime( void ) noexcept;
-float GetExactTime( void ) noexcept;
-
-#endif
+#pragma once
+void InitTime() noexcept;
+void MarkTimeThisTick() noexcept;
+float GetElapsedTime() noexcept;
+float GetExactTime() noexcept;

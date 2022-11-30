@@ -4,27 +4,28 @@
 #include <chrono>
 #include <thread>
 using namespace std::literals;
-bool input() noexcept { return false; }
+bool input()  { std::this_thread::sleep_for(100ms); return false; }
 void update() { std::this_thread::sleep_for(200ms); }
-void render() {
-  std::this_thread::sleep_for(400ms);
-  Profiler::Draw(); // output profiling text from last frame
-}
+void render() { std::this_thread::sleep_for(400ms); }
 
 int main() {
   InitTime();
   Profiler::Init();
   bool exitGame = false;
   while (!exitGame) {
-    Profiler::Begin("Main Game Loop");
-        exitGame = input();
-        update();
-        Profiler::Begin("Graphics Draw Routine");
+    MarkTimeThisTick();    
+    Profiler::Begin("Main Game Loop");    
+            exitGame = input();
+        Profiler::Begin("Update");
+            update();
+        Profiler::End("Update");
+        Profiler::Begin("Render");
             render();
-        Profiler::End("Graphics Draw Routine");
-    Profiler::End("Main Game Loop");
+        Profiler::End("Render");   
+    Profiler::End("Main Game Loop");    
     
     Profiler::Profile(); // buffer will be drawn next frame
+    Profiler::Draw();
   }
   return 0;
 }
