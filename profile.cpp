@@ -56,10 +56,29 @@ void assert_if_invalid(const Sample &s) noexcept {
   }
 }
 
+bool hasParents(const Sample &s) noexcept { return s.iNumParents > 0; }
+
 bool isParent(const Sample &s) noexcept { return s.iOpenProfiles > 0; }
+
 size_t countParents() noexcept {
   return std::ranges::count_if(samples, isParent);
 }
+
+auto findClosestParent() noexcept {
+  auto parent = std::ranges::find_if(samples, isParent);
+  if (parent != std::end(samples)) {
+    const auto isCloser = [](const auto &s1, const auto &s2) noexcept -> bool {
+      return s1.fStartTime >= s2.fStartTime;
+    };
+    for (auto i = parent; i < std::end(samples); ++i) {
+      if (isParent(*i) && isCloser(*i, *parent)) {
+        parent = i; // Replace with more immediate parent
+      }
+    }
+  }
+  return parent;
+}
+
 
 Profiler::Profiler() noexcept { _startTime = GetExactTime(); }
 void Profiler::Begin(std::string_view name) {
@@ -74,7 +93,7 @@ void Profiler::Begin(std::string_view name) {
   it->fStartTime = GetExactTime();
 }
 
-void Profiler::End(std::string_view name) {
+void Profiler::End(std::string_view name) noexcept {
   const auto &it = std::ranges::find_if(
       samples, [name](const auto &sample) { return name == sample.szName; });
   if (it == std::end(samples)) {
@@ -82,30 +101,14 @@ void Profiler::End(std::string_view name) {
     return;
   }
   const float fEndTime = GetExactTime();
-  it->fAccumulator += fEndTime - it->fStartTime;
+  const float dt = fEndTime - it->fStartTime;
+  it->fAccumulator += dt;
   it->iOpenProfiles--;
   it->iNumParents = countParents();
-  if (it->iNumParents) {
+  if (hasParents(*it)) {
     const auto parent = findClosestParent();
-    if (parent >= 0) { // Record this time in fChildrenSampleTime (add it in)
-      samples[parent].fChildrenSampleTime += fEndTime - it->fStartTime;
-    }
+    parent->fChildrenSampleTime += dt; // Record this time in fChildrenSampleTime (add it in)    
   }
-}
-int findClosestParent() noexcept {   
-  int parent = -1;
-  for (int i = 0; i < std::ssize(samples); ++i) {
-    if (isParent(samples[i])) {
-      if (parent < 0) { // Replace invalid parent (index)
-        parent = i;
-      } else if (samples[i].fStartTime >=
-                 samples[parent]
-                     .fStartTime) { // Replace with more immediate parent
-        parent = i;
-      }
-    }
-  }
-  return parent;
 }
 
 void Profiler::Profile(void) {
@@ -155,18 +158,14 @@ void Profiler::StoreProfileInHistory(std::string_view name, float percent) {
 
 Profiler::TimePerFrame
 Profiler::GetProfileFromHistory(std::string_view name) noexcept {
-  const auto it = std::ranges::find_if(
+  const auto parent = std::ranges::find_if(
       history, [&name](const auto &sample) { return sample.szName == name; });
-
-  if (it != std::end(history)) {
-    return it->times;
+  if (parent != std::end(history)) {
+    return parent->times;
   }
-
   return {};
 }
 
-void Profiler::Draw(void) {
-  if (!textBox.empty()) {
-    std::cout << textBox << "\n";
-  }
+void Profiler::Draw(void) {  
+    std::cout << textBox << "\n";  
 }

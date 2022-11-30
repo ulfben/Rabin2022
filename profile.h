@@ -22,7 +22,7 @@ public:
 
   Profiler() noexcept;
   void Begin(std::string_view name);
-  void End(std::string_view name);
+  void End(std::string_view name) noexcept;
   void Profile(void);
   void Draw();
 
@@ -31,4 +31,4 @@ private:
   TimePerFrame GetProfileFromHistory(std::string_view name) noexcept;
 };
 
-int findClosestParent() noexcept;
+
