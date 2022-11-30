@@ -30,3 +30,5 @@ private:
   void StoreProfileInHistory(std::string_view name, float percent);
   TimePerFrame GetProfileFromHistory(std::string_view name) noexcept;
 };
+
+int findClosestParent() noexcept;
