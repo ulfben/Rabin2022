@@ -16,8 +16,7 @@ public:
   struct TimePerFrame {
     float average = .0f; // Average time per frame (percentage)
     float min = .0f;     // Minimum time per frame (percentage)
-    float max = .0f;     // Maximum time per frame (percentage)
-    void setAll(float v) noexcept { average = min = max = v; }
+    float max = .0f;     // Maximum time per frame (percentage)   
   };
 
   Profiler() noexcept;
