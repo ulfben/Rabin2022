@@ -11,28 +11,22 @@
 #include <string.h>
 struct Sample {
   std::string szName;
-  bool bValid = false;                // Whether this data is valid
   unsigned int iProfileInstances = 0; // # of times ProfileBegin called
   int iOpenProfiles = 0;              // # of times ProfileBegin w/o ProfileEnd
-
-  float fStartTime = 0.0f;          // The current open profile start time
-  float fAccumulator = 0.0f;        // All samples this frame added together
-  float fChildrenSampleTime = 0.0f; // Time taken by all children
-  unsigned int iNumParents = 0;     // Number of profile parents
-  Sample(std::string_view name) {
-    szName = name;
-    bValid = true;
-    iOpenProfiles = 1;
-    iProfileInstances = 1;
-    fStartTime = GetExactTime();
-  }
+  float fStartTime = 0.0f;            // The current open profile start time
+  float fAccumulator = 0.0f;          // All samples this frame added together
+  float fChildrenSampleTime = 0.0f;   // Time taken by all children
+  unsigned int iNumParents = 0;       // Number of profile parents
+  Sample(std::string_view name)
+      : szName{name}, iOpenProfiles{1}, iProfileInstances{1},
+        fStartTime{GetExactTime()} {}
 };
 
 struct SampleHistory {
   bool bValid = false; // Whether the data is valid
   std::string szName;  // Name of the sample
   Profiler::TimePerFrame times{};
-   SampleHistory(std::string_view name, float percent) {
+  SampleHistory(std::string_view name, float percent) {
     szName = name;
     bValid = true;
     times.setAll(percent);
@@ -47,10 +41,9 @@ std::string textBox = "";
 
 Profiler::Profiler() { _startTime = GetExactTime(); }
 void Profiler::Begin(std::string_view name) {
-  auto it = std::ranges::find_if(samples, [&name](auto &sample) {
-    return sample.bValid && sample.szName == name;
-  });
-  if (it != std::end(samples)) {      
+  auto it = std::ranges::find_if(
+      samples, [&name](auto &sample) { return sample.szName == name; });
+  if (it != std::end(samples)) {
     it->iOpenProfiles++;
     it->iProfileInstances++;
     it->fStartTime = GetExactTime();
@@ -64,7 +57,7 @@ void Profiler::End(std::string_view name) {
   unsigned int i = 0;
   unsigned int numParents = 0;
 
-  while (i < std::size(samples) && samples[i].bValid == true) {
+  while (i < std::size(samples)) {
     if (name == samples[i].szName) {
       unsigned int inner = 0;
       int parent = -1;
@@ -72,7 +65,7 @@ void Profiler::End(std::string_view name) {
       samples[i].iOpenProfiles--;
 
       // Count all parents and find the immediate parent
-      while (inner < std::size(samples) && samples[inner].bValid == true) {
+      while (inner < std::size(samples)) {
         if (samples[inner].iOpenProfiles >
             0) { // Found a parent (any open profiles are parents)
           numParents++;
@@ -111,14 +104,13 @@ void Profiler::Profile(void) {
   textBox.append("  Ave :   Min :   Max :   # : Profile Name\n");
   textBox.append("--------------------------------------------\n");
 
-  while (i < std::size(samples) && samples[i].bValid == true) {
+  while (i < std::size(samples)) {
     if (samples[i].iOpenProfiles < 0) {
       assert(!"ProfileEnd() called without a ProfileBegin()");
     } else if (samples[i].iOpenProfiles > 0) {
       assert(!"ProfileBegin() called without a ProfileEnd()");
     }
-    const auto sampleTime =
-        samples[i].fAccumulator - samples[i].fChildrenSampleTime;
+    const auto sampleTime = samples[i].fAccumulator - samples[i].fChildrenSampleTime;
     const auto percentTime = (sampleTime / (_endTime - _startTime)) * 100.0f;
 
     // Add new measurement into the history and get the ave, min, and max
@@ -180,7 +172,6 @@ void Profiler::StoreProfileInHistory(std::string_view name, float percent) {
     }
     i++;
   }
-
   history.push_back(SampleHistory(name, percent));
 }
 Profiler::TimePerFrame Profiler::GetProfileFromHistory(std::string_view name) {
