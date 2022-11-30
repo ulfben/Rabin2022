@@ -92,7 +92,7 @@ void Profiler::End(std::string_view name) {
     }
   }
 }
-int findClosestParent() noexcept {
+int findClosestParent() noexcept {   
   int parent = -1;
   for (int i = 0; i < std::ssize(samples); ++i) {
     if (isParent(samples[i])) {
@@ -107,6 +107,7 @@ int findClosestParent() noexcept {
   }
   return parent;
 }
+
 void Profiler::Profile(void) {
   _endTime = GetExactTime();
   textBox.clear();

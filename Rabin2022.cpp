@@ -16,6 +16,7 @@ void render() {
 }
 
 int main() {
+  InitTime();
   bool exitGame = false;
   while (!exitGame) {
     profiler.Begin("Main Game Loop");
