@@ -10,9 +10,9 @@
 #ifndef _CUSTOM_TIME_H
 #define _CUSTOM_TIME_H
 
-void InitTime( void );
-void MarkTimeThisTick( void );
-float GetElapsedTime( void );
-float GetExactTime( void );
+void InitTime( void ) noexcept;
+void MarkTimeThisTick( void ) noexcept;
+float GetElapsedTime( void ) noexcept;
+float GetExactTime( void ) noexcept;
 
 #endif

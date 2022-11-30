@@ -20,14 +20,13 @@ public:
     void setAll(float v) noexcept { average = min = max = v; }
   };
 
-  Profiler();
+  Profiler() noexcept;
   void Begin(std::string_view name);
   void End(std::string_view name);
   void Profile(void);
-
   void Draw();
 
 private:
   void StoreProfileInHistory(std::string_view name, float percent);
-  TimePerFrame GetProfileFromHistory(std::string_view name);
+  TimePerFrame GetProfileFromHistory(std::string_view name) noexcept;
 };

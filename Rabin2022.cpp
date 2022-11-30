@@ -8,7 +8,7 @@ using namespace std::literals;
 
 Profiler profiler;
 
-void input() {  }
+bool input() noexcept { return false; }
 void update() { std::this_thread::sleep_for(200ms); }
 void render() {
   std::this_thread::sleep_for(400ms);
@@ -19,7 +19,7 @@ int main() {
   bool exitGame = false;
   while (!exitGame) {
     profiler.Begin("Main Game Loop");
-        input();
+        exitGame = input();
         update();
         profiler.Begin("Graphics Draw Routine");
             render();
