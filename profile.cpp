@@ -40,14 +40,13 @@ Profiler::Profiler() { _startTime = GetExactTime(); }
 void Profiler::Begin(std::string_view name) {
   auto it = std::ranges::find_if(
       samples, [&name](auto &sample) { return sample.szName == name; });
-  if (it != std::end(samples)) {
-    it->iOpenProfiles++;
-    it->iProfileInstances++;
-    it->fStartTime = GetExactTime();
-    assert(it->iOpenProfiles == 1); // max 1 open at once
+  if (it == std::end(samples)) {
+    samples.push_back(Sample(name));
     return;
   }
-  samples.push_back(Sample(name));
+  it->iOpenProfiles++;
+  it->iProfileInstances++;
+  it->fStartTime = GetExactTime();
 }
 
 void Profiler::End(std::string_view name) {
@@ -138,39 +137,35 @@ void Profiler::Profile(void) {
   }
 }
 void Profiler::StoreProfileInHistory(std::string_view name, float percent) {
-  unsigned int i = 0;
-  float oldRatio;
-  float newRatio = 0.8f * GetElapsedTime();
-  if (newRatio > 1.0f) {
-    newRatio = 1.0f;
+  const float newRatio = std::min(0.8f * GetElapsedTime(), 1.0f); //limit to 1
+  const float oldRatio = 1.0f - newRatio;
+
+  const auto it = std::ranges::find_if(
+      history, [&name](const auto &sample) { return sample.szName == name; });
+
+  if (it == std::end(history)) {
+    history.push_back(SampleHistory(name, percent));
+    return;
   }
-  oldRatio = 1.0f - newRatio;
 
-  while (i < std::size(history)) {
-    if (name == history[i].szName) { // Found the sample
-      auto &sample = history[i];
-      sample.times.average =
-          (sample.times.average * oldRatio) + (percent * newRatio);
-      if (percent < sample.times.min) {
-        sample.times.min = percent;
-      } else {
-        sample.times.min = (sample.times.min * oldRatio) + (percent * newRatio);
-      }
-
-      if (sample.times.min < 0.0f) {
-        sample.times.min = 0.0f;
-      }
-
-      if (percent > sample.times.max) {
-        sample.times.max = percent;
-      } else {
-        sample.times.max = (sample.times.max * oldRatio) + (percent * newRatio);
-      }
-      return;
-    }
-    i++;
+  auto &times = it->times;
+  times.average = (times.average * oldRatio) + (percent * newRatio);
+  if (percent < times.min) {
+    times.min = percent;
+  } else {
+    times.min = (times.min * oldRatio) + (percent * newRatio);
   }
-  history.push_back(SampleHistory(name, percent));
+
+  if (times.min < 0.0f) {
+    times.min = 0.0f;
+  }
+
+  if (percent > times.max) {
+    times.max = percent;
+  } else {
+    times.max = (times.max * oldRatio) + (percent * newRatio);
+  }
+  it->times = times;
 }
 Profiler::TimePerFrame Profiler::GetProfileFromHistory(std::string_view name) {
   const auto it = std::ranges::find_if(
