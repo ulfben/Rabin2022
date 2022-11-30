@@ -23,12 +23,9 @@ struct Sample {
 };
 
 struct SampleHistory {
-  bool bValid = false; // Whether the data is valid
-  std::string szName;  // Name of the sample
+  std::string szName; // Name of the sample
   Profiler::TimePerFrame times{};
-  SampleHistory(std::string_view name, float percent) {
-    szName = name;
-    bValid = true;
+  SampleHistory(std::string_view name, float percent) : szName{name} {
     times.setAll(percent);
   }
 };
@@ -110,7 +107,8 @@ void Profiler::Profile(void) {
     } else if (samples[i].iOpenProfiles > 0) {
       assert(!"ProfileBegin() called without a ProfileEnd()");
     }
-    const auto sampleTime = samples[i].fAccumulator - samples[i].fChildrenSampleTime;
+    const auto sampleTime =
+        samples[i].fAccumulator - samples[i].fChildrenSampleTime;
     const auto percentTime = (sampleTime / (_endTime - _startTime)) * 100.0f;
 
     // Add new measurement into the history and get the ave, min, and max
@@ -148,7 +146,7 @@ void Profiler::StoreProfileInHistory(std::string_view name, float percent) {
   }
   oldRatio = 1.0f - newRatio;
 
-  while (i < std::size(history) && history[i].bValid == true) {
+  while (i < std::size(history)) {
     if (name == history[i].szName) { // Found the sample
       auto &sample = history[i];
       sample.times.average =
@@ -175,13 +173,13 @@ void Profiler::StoreProfileInHistory(std::string_view name, float percent) {
   history.push_back(SampleHistory(name, percent));
 }
 Profiler::TimePerFrame Profiler::GetProfileFromHistory(std::string_view name) {
-  unsigned int i = 0;
-  while (i < std::size(history) && history[i].bValid == true) {
-    if (name == history[i].szName) { // Found the sample
-      return history[i].times;
-    }
-    i++;
+  const auto it = std::ranges::find_if(
+      history, [&name](const auto &sample) { return sample.szName == name; });
+
+  if (it != std::end(history)) {
+    return it->times;
   }
+
   return {};
 }
 void Profiler::Draw(void) {
